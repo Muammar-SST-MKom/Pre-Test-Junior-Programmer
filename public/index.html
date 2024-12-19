@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Layanan Streaming Film @ Muammar,SST,M.Kom</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .card-img-top {
+            object-fit: cover;
+            height: 200px;
+        }
+        #filmModal .modal-body img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Daftar Film</h1>
+        <p class="text-center">Copyright @ Desember 2024 - Muammar,SST,M.Kom</p>
+
+        <div class="mb-3">
+            <label for="kategori-filter" class="form-label">Filter Kategori:</label>
+            <select class="form-select" id="kategori-filter">
+                <option value="">Semua Kategori</option>
+            </select>
+        </div>
+
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" id="search-input" placeholder="Cari film...">
+            <button class="btn btn-outline-secondary" type="button" id="search-button">Cari</button>
+        </div>
+
+        <div id="loading">Memuat Film...</div>
+        <div class="row" id="film-list"></div>
+
+        <div class="modal fade" id="filmModal" tabindex="-1" aria-labelledby="filmModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="filmModalLabel">Detail Film</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <img id="detail-poster" src="" alt="Poster Film" class="img-fluid">
+                            </div>
+                            <div class="col-md-8">
+                                <h3 id="detail-judul"></h3>
+                                <p id="detail-sinopsis"></p>
+                                <p id="detail-tahun"></p>
+                                <video id="detail-video" width="100%" controls></video>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const filmList = document.getElementById('film-list');
+        const filmModal = new bootstrap.Modal(document.getElementById('filmModal'));
+        const detailJudul = document.getElementById('detail-judul');
+        const detailSinopsis = document.getElementById('detail-sinopsis');
+        const detailTahun = document.getElementById('detail-tahun');
+        const detailVideo = document.getElementById('detail-video');
+        const detailPoster = document.getElementById('detail-poster');
+        const loadingIndicator = document.getElementById('loading');
+        const kategoriFilter = document.getElementById('kategori-filter');
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+
+        let currentFilms = [];
+
+        function showLoading() {
+            loadingIndicator.style.display = 'block';
+            filmList.innerHTML = '';
+        }
+
+        function hideLoading() {
+            loadingIndicator.style.display = 'none';
+        }
+
+        async function fetchFilms(query = '') {
+            showLoading();
+            try {
+                let url = '/api/film';
+                if (query) {
+                    url += query;
+                }
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                currentFilms = data;
+                filmList.innerHTML = '';
+                if (data.length === 0) {
+                    filmList.innerHTML = '<div class="alert alert-info">Tidak ada film yang ditemukan.</div>';
+                } else {
+                    data.forEach(film => {
+                        const filmCard = document.createElement('div');
+                        filmCard.classList.add('col-md-3', 'mb-3');
+                        filmCard.innerHTML = `
+                            <div class="card">
+                                <img src="${film.poster}" class="card-img-top" alt="${film.judul_film}">
+                                <div class="card-body">
+                                    <h5 class="card-title">${film.judul_film}</h5>
+                                    <button class="btn btn-primary detail-button" data-film-id="${film.id_film}" data-bs-toggle="modal" data-bs-target="#filmModal">Detail</button>
+                                </div>
+                            </div>
+                        `;
+                        filmList.appendChild(filmCard);
+                    });
+
+                    const detailButtons = document.querySelectorAll('.detail-button');
+                    detailButtons.forEach(button => {
+                        button.addEventListener('click', async (event) => {
+                            const filmId = button.dataset.filmId;
+                            try {
+                                const response = await fetch(`/api/film/${filmId}`);
+                                if (!response.ok) {
+                                    throw new Error(`HTTP error! status: ${response.status}`);
+                                }
+                                const film = await response.json();
+                                detailJudul.textContent = film.judul_film;
+                                detailSinopsis.textContent = film.sinopsis;
+                                detailTahun.textContent = film.tahun_rilis;
+                                detailVideo.src = film.path_video;
+                                detailPoster.src = film.poster;
+                                detailPoster.alt = `Poster Film ${film.judul_film}`;
+                            } catch (error) {
+                                console.error("Error fetching film details:", error);
+                                alert("Terjadi kesalahan saat memuat detail film.");
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching films:', error);
+                filmList.innerHTML = '<div class="alert alert-danger">Terjadi kesalahan saat memuat film.</div>';
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function fetchKategori() {
+            try {
+                const response = await fetch('/api/kategori');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                data.forEach(kategori => {
+                    const option = document.createElement('option');
+                    option.value = kategori.id_kategori;
+                    option.text = kategori.nama_kategori;
+                    kategoriFilter.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+            }
+        }
+
+        kategoriFilter.addEventListener('change', () => {
+            const selectedKategori = kategoriFilter.value;
+            let query = '';
+            if (selectedKategori) {
+                query = `?kategori=${selectedKategori}`;
+            }
+            fetchFilms(query);
+        });
+
+        searchButton.addEventListener('click', () => {
+            const searchTerm = searchInput.value;
+            let query = '';
+            if (searchTerm) {
+                query = `?cari=${searchTerm}`;
+            }
+            fetchFilms(query);
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchKategori();
+            fetchFilms();
+        });
+    </script>
+</body>
+</html>
